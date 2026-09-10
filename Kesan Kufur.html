@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pop The Balloons: Kesan Kufur</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(to bottom, #87CEEB, #E0F6FF);
+        }
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        /* UI HUD Header */
+        #hud {
+            position: absolute;
+            top: 15px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .hud-box {
+            background: rgba(255, 255, 255, 0.85);
+            padding: 8px 18px;
+            border-radius: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+            font-weight: bold;
+            font-size: 1.2rem;
+            color: #333;
+            backdrop-filter: blur(5px);
+        }
+        #lives span {
+            font-size: 1.5rem;
+            margin: 0 2px;
+            transition: transform 0.2s;
+        }
+        /* Overlays / Screens */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            color: white;
+            text-align: center;
+            padding: 20px;
+        }
+        .card-panel {
+            background: white;
+            color: #333;
+            padding: 25px 35px;
+            border-radius: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            max-width: 90%;
+            width: 550px;
+            text-align: center;
+        }
+        h1 { font-size: 2.2rem; margin-bottom: 15px; color: #ff4757; }
+        p { font-size: 1.1rem; margin-bottom: 20px; line-height: 1.5; }
+        
+        .btn {
+            background: #2ed573;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 1.3rem;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(46, 213, 115, 0.4);
+            transition: all 0.2s;
+        }
+        .btn:hover {
+            transform: scale(1.05);
+            background: #26af5f;
+        }
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Card Bonus Styles */
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin: 20px 0;
+            width: 100%;
+        }
+        .bonus-card {
+            height: 110px;
+            background: linear-gradient(135deg, #ff9ff3, #f368e0);
+            border-radius: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2.5rem;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            transition: transform 0.4s ease;
+            transform-style: preserve-3d;
+            border: 3px solid white;
+        }
+        .bonus-card.flipped {
+            transform: rotateY(180deg);
+            background: #f1f2f6;
+        }
+        
+        /* Floating Emoji Effect */
+        .floating-emoji {
+            position: absolute;
+            font-size: 3rem;
+            pointer-events: none;
+            animation: floatUp 1s ease-out forwards;
+            z-index: 15;
+        }
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0) scale(0.8); }
+            100% { opacity: 0; transform: translateY(-80px) scale(1.5); }
+        }
+
+        @media (max-width: 600px) {
+            .hud-box { font-size: 0.9rem; padding: 6px 12px; }
+            #lives span { font-size: 1.1rem; }
+            h1 { font-size: 1.6rem; }
+            p { font-size: 0.95rem; }
+            .bonus-card { height: 80px; font-size: 2rem; }
+            .btn { font-size: 1rem; padding: 10px 20px; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <!-- UI Top Bar -->
+    <div id="hud">
+        <div class="hud-box" id="score-box">Betul: <span id="score">0</span>/6</div>
+        <div class="hud-box" id="lives">Nyawa: ❤️ ❤️ ❤️</div>
+    </div>
+
+    <!-- Canvas Play Area -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Start Overlay Screen -->
+    <div id="start-screen" class="overlay">
+        <div class="card-panel">
+            <h1>🎈 Pop The Balloons! 🎈</h1>
+            <h2 style="color:#57606f; margin-bottom: 15px;">Topik: Kesan Kufur</h2>
+            <p><strong>Cara Bermain:</strong><br>
+            Pecahkan belon yang mengandungi <strong>Kesan Kufur</strong> sahaja.<br> Elakkan memecahkan belon "Bukan Kesan Kufur". Pemain mempunyai 3 nyawa!</p>
+            <button class="btn" onclick="startGame()">Mula Bermain</button>
+        </div>
+    </div>
+
+    <!-- Bonus Round Overlay -->
+    <div id="bonus-screen" class="overlay" style="display: none;">
+        <div class="card-panel">
+            <h2 style="color: #ff9f43; margin-bottom: 5px;">🎁 Pusingan Bonus! 🎁</h2>
+            <p>Tahniah! Pilih 1 kad untuk mencari Trofi 🏆!</p>
+            <div class="card-grid" id="card-grid"></div>
+            <button class="btn" id="bonus-next-btn" style="display: none;" onclick="finishGame()">Lihat Keputusan</button>
+        </div>
+    </div>
+
+    <!-- End Game Overlay -->
+    <div id="end-screen" class="overlay" style="display: none;">
+        <div class="card-panel">
+            <h1 id="end-title">Permainan Tamat!</h1>
+            <p id="end-message"></p>
+            <div style="font-size: 1.3rem; margin-bottom: 20px; font-weight: bold;">
+                Jumlah Jawapan Betul: <span id="final-score" style="color: #2ed573;">0</span> / 6
+            </div>
+            <button class="btn" onclick="restartGame()">Main Semula 🔄</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- AUDIO SYSTEM (Web Audio API) ---
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx;
+
+    function initAudio() {
+        if (!audioCtx) audioCtx = new AudioCtx();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+    }
+
+    // Sound FX: Pop Sound (Betul)
+    function playPopSound() {
+        if(!audioCtx) return;
+        let osc = audioCtx.createOscillator();
+        let gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.08);
+        gain.gain.setValueAtTime(1, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.08);
+    }
+
+    // Sound FX: Wrong Sound
+    function playWrongSound() {
+        if(!audioCtx) return;
+        let osc = audioCtx.createOscillator();
+        let gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+        osc.frequency.linearRampToValueAtTime(110, audioCtx.currentTime + 0.25);
+        gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.25);
+    }
+
+    // Background Music (Cheerful Melody Loop)
+    let isBgmPlaying = false;
+    function startBGM() {
+        if (isBgmPlaying || !audioCtx) return;
+        isBgmPlaying = true;
+        
+        const notes = [261.63, 329.63, 392.00, 523.25, 392.00, 329.63]; // C, E, G, C, G, E
+        let step = 0;
+        
+        setInterval(() => {
+            if (!isBgmPlaying) return;
+            let osc = audioCtx.createOscillator();
+            let gain = audioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(notes[step % notes.length], audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.2);
+            step++;
+        }, 300);
+    }
+
+    // --- SOALAN DATA ---
+    const dataKesan = [
+        "Mendapat kemurkaan dan azab Allah SWT.",
+        "Mendapat kerugian di dunia dan di akhirat.",
+        "Hilang kepercayaan dan kasih sayang daripada orang lain.",
+        "Hati menjadi jauh daripada petunjuk Allah SWT.",
+        "Kehidupan tidak mendapat keberkatan.",
+        "Mendapat balasan buruk di akhirat jika tidak bertaubat."
+    ];
+
+    const dataBukanKesan = [
+        "Mendapat pahala daripada Allah SWT.",
+        "Hati menjadi tenang kerana mengingati Allah SWT.",
+        "Mendapat kasih sayang dan kepercayaan orang lain.",
+        "Mendapat keberkatan dalam kehidupan.",
+        "Mendapat ganjaran syurga.",
+        "Hubungan sesama manusia menjadi lebih baik.",
+        "Mendapat petunjuk daripada Allah SWT."
+    ];
+
+    // --- GAME ENGINE & SETUP ---
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    let width, height;
+    let balloons = [];
+    let correctCount = 0;
+    let lives = 3;
+    let gameActive = false;
+
+    const colors = [
+        '#FF4757', '#2ED573', '#1E90FF', '#FFA502', 
+        '#9B59B6', '#FF6B81', '#00CECE', '#E84393'
+    ];
+
+    function resizeCanvas() {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // Balloon Class
+    class Balloon {
+        constructor(text, isCorrect) {
+            this.text = text;
+            this.isCorrect = isCorrect;
+            this.radius = Math.min(width, height) * 0.075 + 15; // Responsive radius
+            this.x = Math.random() * (width - this.radius * 2) + this.radius;
+            this.y = Math.random() * (height - this.radius * 2 - 100) + this.radius + 60;
+            this.color = colors[Math.floor(Math.random() * colors.length)];
+            this.vx = (Math.random() - 0.5) * 2;
+            this.vy = (Math.random() - 0.5) * 2;
+        }
+
+        draw() {
+            ctx.save();
+            // Draw String / Tali Belon
+            ctx.beginPath();
+            ctx.moveTo(this.x, this.y + this.radius);
+            ctx.lineTo(this.x, this.y + this.radius + 30);
+            ctx.strokeStyle = '#666';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Draw Balloon Body
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fillStyle = this.color;
+            ctx.fill();
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+            ctx.stroke();
+
+            // Draw Highlight (Kilauan)
+            ctx.beginPath();
+            ctx.arc(this.x - this.radius * 0.3, this.y - this.radius * 0.3, this.radius * 0.2, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+            ctx.fill();
+
+            // Draw Text Inside Balloon
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${Math.max(11, this.radius * 0.22)}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            // Wrap Text
+            const words = this.text.split(' ');
+            let line = '';
+            let lines = [];
+            let maxWidth = this.radius * 1.6;
+
+            for(let i = 0; i < words.length; i++) {
+                let testLine = line + words[i] + ' ';
+                if (ctx.measureText(testLine).width > maxWidth && i > 0) {
+                    lines.push(line);
+                    line = words[i] + ' ';
+                } else {
+                    line = testLine;
+                }
+            }
+            lines.push(line);
+
+            let lineHeight = this.radius * 0.28;
+            let startY = this.y - ((lines.length - 1) * lineHeight) / 2;
+
+            lines.forEach((l, idx) => {
+                // Text Shadow / Border
+                ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+                ctx.lineWidth = 3;
+                ctx.strokeText(l.trim(), this.x, startY + (idx * lineHeight));
+                ctx.fillText(l.trim(), this.x, startY + (idx * lineHeight));
+            });
+
+            ctx.restore();
+        }
+
+        update() {
+            this.x += this.vx;
+            this.y += this.vy;
+
+            // Bounce on Canvas Screen Boundaries
+            if (this.x - this.radius < 10 || this.x + this.radius > width - 10) this.vx *= -1;
+            if (this.y - this.radius < 70 || this.y + this.radius > height - 20) this.vy *= -1;
+        }
+    }
+
+    // Initialize 12 Balloons
+    function createBalloons() {
+        balloons = [];
+        // 6 Betul
+        dataKesan.forEach(text => {
+            balloons.push(new Balloon(text, true));
+        });
+        // Choose 6 Random Bukan Kesan
+        let shuffledBukan = [...dataBukanKesan].sort(() => 0.5 - Math.random()).slice(0, 6);
+        shuffledBukan.forEach(text => {
+            balloons.push(new Balloon(text, false));
+        });
+
+        // Shuffle Array
+        balloons.sort(() => 0.5 - Math.random());
+    }
+
+    function updateHUD() {
+        document.getElementById('score').innerText = correctCount;
+        let hearts = '';
+        for (let i = 0; i < 3; i++) {
+            hearts += (i < lives) ? '❤️ ' : '🖤 ';
+        }
+        document.getElementById('lives').innerHTML = 'Nyawa: ' + hearts;
+    }
+
+    function showFloatingEmoji(x, y, emoji) {
+        const el = document.createElement('div');
+        el.className = 'floating-emoji';
+        el.innerText = emoji;
+        el.style.left = `${x - 25}px`;
+        el.style.top = `${y - 25}px`;
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 1000);
+    }
+
+    // --- GAME LOOP ---
+    function animate() {
+        if (!gameActive) return;
+        ctx.clearRect(0, 0, width, height);
+
+        balloons.forEach(balloon => {
+            balloon.update();
+            balloon.draw();
+        });
+
+        requestAnimationFrame(animate);
+    }
+
+    // --- INPUT CONTROLS ---
+    function handlePointer(e) {
+        if (!gameActive) return;
+
+        let clickX = e.clientX || (e.touches && e.touches[0].clientX);
+        let clickY = e.clientY || (e.touches && e.touches[0].clientY);
+
+        for (let i = balloons.length - 1; i >= 0; i--) {
+            let b = balloons[i];
+            let dist = Math.hypot(clickX - b.x, clickY - b.y);
+
+            if (dist < b.radius) {
+                // Balloon Clicked!
+                if (b.isCorrect) {
+                    playPopSound();
+                    showFloatingEmoji(clickX, clickY, '👏✨');
+                    correctCount++;
+                    balloons.splice(i, 1);
+                    updateHUD();
+
+                    if (correctCount >= 6) {
+                        setTimeout(triggerBonusRound, 500);
+                    }
+                } else {
+                    playWrongSound();
+                    showFloatingEmoji(clickX, clickY, '❌💥');
+                    lives--;
+                    balloons.splice(i, 1);
+                    updateHUD();
+
+                    if (lives <= 0) {
+                        setTimeout(gameOver, 500);
+                    }
+                }
+                break;
+            }
+        }
+    }
+
+    window.addEventListener('mousedown', handlePointer);
+    window.addEventListener('touchstart', (e) => {
+        handlePointer(e);
+    });
+
+    // --- GAME STATES ---
+    function startGame() {
+        initAudio();
+        startBGM();
+        correctCount = 0;
+        lives = 3;
+        updateHUD();
+        createBalloons();
+        
+        document.getElementById('start-screen').style.display = 'none';
+        document.getElementById('end-screen').style.display = 'none';
+        document.getElementById('bonus-screen').style.display = 'none';
+
+        gameActive = true;
+        animate();
+    }
+
+    function gameOver() {
+        gameActive = false;
+        document.getElementById('end-title').innerText = "Permainan Gagal! 😢";
+        document.getElementById('end-title').style.color = "#ff4757";
+        document.getElementById('end-message').innerText = "Nyawa anda telah habis. Sila cuba lagi!";
+        document.getElementById('final-score').innerText = correctCount;
+        document.getElementById('end-screen').style.display = 'flex';
+    }
+
+    // --- BONUS ROUND SYSTEM ---
+    function triggerBonusRound() {
+        gameActive = false;
+        document.getElementById('bonus-screen').style.display = 'flex';
+        const grid = document.getElementById('card-grid');
+        grid.innerHTML = '';
+        document.getElementById('bonus-next-btn').style.display = 'none';
+
+        // Setup 6 Cards: 1 Trophy, 5 Bomb
+        let cardsData = ['🏆', '💣', '💣', '💣', '💣', '💣'];
+        cardsData.sort(() => 0.5 - Math.random());
+
+        cardsData.forEach((item) => {
+            const card = document.createElement('div');
+            card.className = 'bonus-card';
+            card.innerText = '❓';
+            
+            card.onclick = () => {
+                if(card.classList.contains('flipped')) return;
+                
+                // Flip all cards reveal
+                document.querySelectorAll('.bonus-card').forEach((c, idx) => {
+                    c.classList.add('flipped');
+                    c.innerText = cardsData[idx];
+                });
+
+                if(item === '🏆') {
+                    playPopSound();
+                    showFloatingEmoji(window.innerWidth/2, window.innerHeight/2, '🎉🏆');
+                } else {
+                    playWrongSound();
+                }
+
+                document.getElementById('bonus-next-btn').style.display = 'inline-block';
+            };
+            grid.appendChild(card);
+        });
+    }
+
+    function finishGame() {
+        document.getElementById('bonus-screen').style.display = 'none';
+        document.getElementById('end-title').innerText = "Tahniah! 🎉";
+        document.getElementById('end-title').style.color = "#2ed573";
+        document.getElementById('end-message').innerText = "Anda berjaya mengenal pasti semua Kesan Kufur!";
+        document.getElementById('final-score').innerText = correctCount;
+        document.getElementById('end-screen').style.display = 'flex';
+    }
+
+    function restartGame() {
+        startGame();
+    }
+</script>
+
+</body>
+</html>
